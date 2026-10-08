@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# ZIP files
+*.zip
+
+# Environment
+.env
+.env.local
+.env.*.local
+.env_bck
+**/.env_bck
+*firebase-adminsdk*.json
+
+# Uploads
+backend/uploads/
+frontend/uploads/
+
+# Build
+.next/
+out/
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*

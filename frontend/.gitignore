@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# ZIP files
+*.zip
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Uploads
+backend/uploads/
+frontend/uploads/
+
+# Build
+.next/
+out/
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*

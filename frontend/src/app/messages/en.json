@@ -1,0 +1,10 @@
+{
+    "Navbar": {
+        "home": "Home",
+        "about": "About",
+        "services": "Services",
+        "Crop": "Crop",
+        "gallery": "Gallery",
+        "contact": "Contact"
+    }
+}
