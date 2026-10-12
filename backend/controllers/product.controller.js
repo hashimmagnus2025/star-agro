@@ -2,6 +2,10 @@ import {
   insertProduct,
   getAllProducts,
   getProductsByUserId,
+  getProductsByOwnerDistrict,
+  getProductsByOwnerTaluka,
+  getProductsByOwnerTalukaNames,
+  getProductsByOwnerVillageNames,
   getProductById,
   updateProduct,
   updateProductStatus,
@@ -17,6 +21,13 @@ import {
 } from '../models/product.model.js';
 import { getAllNotificationTokens } from '../models/tokensave.model.js';
 import { getUserById, getUsersByRole } from '../models/user.model.js';
+import {
+  getJurisdictionByUserId,
+  resolveScopeNames,
+  getAssignedTalukaNamesForJurisdiction,
+  getAssignedVillageNamesForJurisdiction,
+} from '../models/jurisdiction.model.js';
+import { normalizeVillageManagedUserRole } from '../utils/villageManagedRoles.js';
 import { createNotification } from '../models/notification.model.js';
 import { sendFCMNotifications } from '../utils/fcm.js';
 import { sendWhatsAppMessage } from '../utils/whatsapp.js';
@@ -185,9 +196,36 @@ export const createProduct = async (req, res) => {
     } = req.body;
 
     // Admin/super_admin can upload a product on behalf of another user via the admin
-    // Products form's user dropdown; everyone else always owns what they create.
+    // Products form's user dropdown. A Village Representative can do the same, but only
+    // for a user/farmer/trader account within their own assigned village; everyone else
+    // always owns what they create.
     const isAdminCreator = req.user?.role === 'admin' || req.user?.role === 'super_admin';
-    const ownerUserId = isAdminCreator && user_id ? Number(user_id) : (req.user?.id || null);
+    let ownerUserId = req.user?.id || null;
+
+    if (isAdminCreator && user_id) {
+      ownerUserId = Number(user_id);
+    } else if (!isAdminCreator && user_id && Number(user_id) !== req.user?.id) {
+      const jurisdiction = await getJurisdictionByUserId(req.user.id);
+      if (jurisdiction?.scope_type !== 'village') {
+        return res.status(403).json({ message: 'You do not have permission to create a product for another user.' });
+      }
+
+      const [targetUser, scopeNames] = await Promise.all([
+        getUserById(user_id),
+        resolveScopeNames(jurisdiction),
+      ]);
+
+      const isSameVillage = targetUser
+        && targetUser.village === scopeNames.village_name
+        && targetUser.taluka === scopeNames.taluka_name
+        && targetUser.district === scopeNames.district_name;
+
+      if (!isSameVillage || !normalizeVillageManagedUserRole(targetUser.role)) {
+        return res.status(403).json({ message: 'You can only create products for user, farmer, or trader accounts in your own village.' });
+      }
+
+      ownerUserId = Number(user_id);
+    }
 
     if (process.env.RECAPTCHA_SECRET_KEY) {
       if (!recaptchaToken) {
@@ -377,6 +415,45 @@ export const getMyProducts = async (req, res) => {
   }
 };
 
+// "My Team Products" — a District or Taluka Representative with product.approve sees every
+// product from users in their own district/taluka (admin/super_admin see every product, same
+// as the main admin Products page) so they can approve/reject without needing site-wide
+// admin access.
+export const getDistrictTeamProducts = async (req, res) => {
+  try {
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'super_admin';
+    if (isAdmin) {
+      const products = await getAllProducts();
+      return res.status(200).json(products);
+    }
+
+    const jurisdiction = req.userJurisdiction || await getJurisdictionByUserId(req.user.id);
+    if (!jurisdiction || (jurisdiction.scope_type !== 'district' && jurisdiction.scope_type !== 'taluka')) {
+      return res.status(403).json({ message: 'You do not have a district or taluka assigned.' });
+    }
+
+    const scopeNames = await resolveScopeNames(jurisdiction);
+    let products;
+    if (jurisdiction.scope_type === 'district') {
+      // If this rep has been narrowed to a specific taluka subset, match that — not their
+      // whole district — otherwise (no subset configured) fall back to the whole district.
+      const talukaNames = await getAssignedTalukaNamesForJurisdiction(jurisdiction.id);
+      products = talukaNames.length > 0
+        ? await getProductsByOwnerTalukaNames(talukaNames)
+        : await getProductsByOwnerDistrict(scopeNames.district_name);
+    } else {
+      const villageNames = await getAssignedVillageNamesForJurisdiction(jurisdiction.id);
+      products = villageNames.length > 0
+        ? await getProductsByOwnerVillageNames(villageNames)
+        : await getProductsByOwnerTaluka(scopeNames.taluka_name);
+    }
+    return res.status(200).json(products);
+  } catch (error) {
+    console.error('Error fetching district team products:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
 export const updateProductController = async (req, res) => {
   try {
     const { id } = req.params;
@@ -541,6 +618,36 @@ export const updateProductStatusController = async (req, res) => {
     const existingProduct = await getProductById(id);
     if (!existingProduct) {
       return res.status(404).json({ message: 'Product not found' });
+    }
+
+    // A District or Taluka Representative with the product.approve permission can only
+    // approve/reject products whose owner is in their own assigned district/taluka (not a
+    // hardcoded role check — admin/super_admin already short-circuit the
+    // hasPermission('product.approve') route guard).
+    const isAdminApprover = req.user.role === 'admin' || req.user.role === 'super_admin';
+    if (!isAdminApprover) {
+      const jurisdiction = req.userJurisdiction || await getJurisdictionByUserId(req.user.id);
+      if (!jurisdiction || (jurisdiction.scope_type !== 'district' && jurisdiction.scope_type !== 'taluka')) {
+        return res.status(403).json({ message: 'You do not have a district or taluka assigned to approve products.' });
+      }
+      const scopeNames = await resolveScopeNames(jurisdiction);
+      let isInScope;
+      if (jurisdiction.scope_type === 'district') {
+        // If this rep has been narrowed to a specific taluka subset, the product's taluka
+        // must be in that subset — not just anywhere in their whole district.
+        const talukaNames = await getAssignedTalukaNamesForJurisdiction(jurisdiction.id);
+        isInScope = talukaNames.length > 0
+          ? talukaNames.includes(existingProduct.seller_taluka)
+          : Boolean(existingProduct.seller_district) && existingProduct.seller_district === scopeNames.district_name;
+      } else {
+        const villageNames = await getAssignedVillageNamesForJurisdiction(jurisdiction.id);
+        isInScope = villageNames.length > 0
+          ? villageNames.includes(existingProduct.seller_village)
+          : Boolean(existingProduct.seller_taluka) && existingProduct.seller_taluka === scopeNames.taluka_name;
+      }
+      if (!isInScope) {
+        return res.status(403).json({ message: 'You can only approve products from users in your own district or taluka.' });
+      }
     }
 
     await updateProductStatus(id, status);

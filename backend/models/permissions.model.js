@@ -29,6 +29,7 @@ const DEFAULT_PERMISSIONS = [
   { name: 'product.create', description: 'Create products' },
   { name: 'product.edit', description: 'Edit products' },
   { name: 'product.delete', description: 'Delete products' },
+  { name: 'product.approve', description: 'Approve or reject products (District Representative: limited to their own district)' },
   { name: 'crop.view', description: 'View crops' },
   { name: 'crop.create', description: 'Create crops' },
   { name: 'crop.edit', description: 'Edit crops' },

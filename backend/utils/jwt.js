@@ -9,6 +9,6 @@ const getJwtSecret = () => {
   return secret;
 };
 
-export const createToken = (payload, expiresIn = '1h') => jwt.sign(payload, getJwtSecret(), { expiresIn });
+export const createToken = (payload, expiresIn = '1y') => jwt.sign(payload, getJwtSecret(), { expiresIn });
 
 export const verifyToken = (token) => jwt.verify(token, getJwtSecret());

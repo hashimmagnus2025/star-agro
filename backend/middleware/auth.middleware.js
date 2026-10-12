@@ -4,6 +4,7 @@ import { getRoleByName } from "../models/role.model.js";
 import { getPermissionByName } from "../models/permissions.model.js";
 import { getJurisdictionByUserId, resolveScopeNames } from "../models/jurisdiction.model.js";
 import AppError from "../utils/AppError.js";
+import { normalizeVillageManagedUserRole } from '../utils/villageManagedRoles.js';
 
 // Protect routes - verify access token
 export const protect = async (req, res, next) => {
@@ -156,9 +157,16 @@ export const restrictToOwnVillage = async (req, res, next) => {
       return next(new AppError('You can only manage users in your own village.', 403));
     }
 
+    if (!normalizeVillageManagedUserRole(targetUser.role || 'user')) {
+      return next(new AppError('You can only manage user, farmer, or trader accounts.', 403));
+    }
+
+    if (req.method === 'PUT' && req.body?.role !== undefined && !normalizeVillageManagedUserRole(req.body.role)) {
+      return next(new AppError('Select a valid user, farmer, or trader role.', 400));
+    }
+
     next();
   } catch (error) {
     return next(new AppError('Failed to verify village jurisdiction.', 500));
   }
 };
-

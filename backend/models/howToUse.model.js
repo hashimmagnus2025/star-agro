@@ -22,7 +22,7 @@ export const insertHowToUse = async ({ title, description, video_url }) => {
 };
 
 export const getAllHowToUse = async () => {
-	const [rows] = await pool.query('SELECT * FROM how_to_use ORDER BY created_at DESC');
+	const [rows] = await pool.query('SELECT * FROM how_to_use ORDER BY created_at ASC, id ASC');
 	return rows;
 };
 

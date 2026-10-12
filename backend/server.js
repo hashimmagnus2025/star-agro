@@ -14,7 +14,7 @@ import MigrationRoutes from './routes/migration.routes.js';
 import PermissionRoutes from './routes/permission.routes.js';
 import RoleRoutes from './routes/role.routes.js';
 import JurisdictionRoutes from './routes/jurisdiction.routes.js';
-import { createJurisdictionTable } from './models/jurisdiction.model.js';
+import { createJurisdictionTable, createJurisdictionTalukasTable, createJurisdictionVillagesTable } from './models/jurisdiction.model.js';
 import CmsRoutes from './routes/cms.routes.js';
 import ContactRoutes from './routes/contact.routes.js';
 import CategoriesRoutes from './routes/categories.routes.js';
@@ -206,6 +206,8 @@ await createDistrictsTable();
 await createTalukasTable();
 await createVillagesTable();
 await createJurisdictionTable();
+await createJurisdictionTalukasTable();
+await createJurisdictionVillagesTable();
 await createNotificationsTable();
 
 startDestroyExpiryJob();

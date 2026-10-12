@@ -4,10 +4,18 @@ import {
   deleteJurisdictionByUserId,
   resolveScopeNames,
   getTalukaRepsInDistrict,
+  getTalukaRepsForTalukaIds,
   getVillageRepsInTaluka,
   getTalukaById,
   getVillageById,
   getUsersInVillage,
+  getAssignedTalukaIdsForJurisdiction,
+  setJurisdictionTalukas,
+  getTalukasWithAssignmentStatus,
+  getAssignedVillageIdsForJurisdiction,
+  setJurisdictionVillages,
+  getVillagesWithAssignmentStatus,
+  getVillageRepsForVillageIds,
 } from '../models/jurisdiction.model.js';
 import { getUserById } from '../models/user.model.js';
 import { getRoleByName } from '../models/role.model.js';
@@ -26,7 +34,7 @@ const SCOPE_TYPES = ['district', 'taluka', 'village'];
 export const assignJurisdiction = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { role_name, scope_type, scope_id } = req.body;
+    const { role_name, scope_type, scope_id, taluka_ids, village_ids } = req.body;
 
     if (!role_name || !scope_type || !scope_id) {
       return res.status(400).json({ message: 'role_name, scope_type and scope_id are required' });
@@ -51,6 +59,38 @@ export const assignJurisdiction = async (req, res) => {
       return res.status(400).json({ message: 'Invalid scope_id for the given scope_type' });
     }
 
+    // A District Representative's scope can optionally be narrowed to a specific subset
+    // of talukas, and a Taluka Representative's scope to a specific subset of villages
+    // (so a district/taluka can be split between multiple reps). Validate exclusivity up
+    // front — a taluka/village already claimed by a different representative can't be reused.
+    let normalizedTalukaIds = null;
+    if (scope_type === 'district' && Array.isArray(taluka_ids)) {
+      normalizedTalukaIds = [...new Set(taluka_ids.map(Number).filter((id) => Number.isInteger(id) && id > 0))];
+
+      const districtTalukas = await getTalukasWithAssignmentStatus(scope_id, userId);
+      const takenIds = normalizedTalukaIds.filter((id) => {
+        const taluka = districtTalukas.find((t) => Number(t.id) === id);
+        return taluka?.taken_by;
+      });
+      if (takenIds.length > 0) {
+        return res.status(409).json({ message: 'One or more selected talukas are already assigned to another representative.' });
+      }
+    }
+
+    let normalizedVillageIds = null;
+    if (scope_type === 'taluka' && Array.isArray(village_ids)) {
+      normalizedVillageIds = [...new Set(village_ids.map(Number).filter((id) => Number.isInteger(id) && id > 0))];
+
+      const talukaVillages = await getVillagesWithAssignmentStatus(scope_id, userId);
+      const takenIds = normalizedVillageIds.filter((id) => {
+        const village = talukaVillages.find((v) => Number(v.id) === id);
+        return village?.taken_by;
+      });
+      if (takenIds.length > 0) {
+        return res.status(409).json({ message: 'One or more selected villages are already assigned to another representative.' });
+      }
+    }
+
     await upsertJurisdiction({
       user_id: userId,
       role_name,
@@ -59,9 +99,55 @@ export const assignJurisdiction = async (req, res) => {
       assigned_by: req.user.id,
     });
 
+    // Keep the taluka/village subset tables in sync with the CURRENT scope_type — upsert
+    // reuses the same jurisdiction row (same id) on every save, so switching a rep away
+    // from district/taluka (or back) must explicitly release any talukas/villages they
+    // previously held. Otherwise the UNIQUE constraint keeps those talukas/villages
+    // permanently claimed by this row even though the rep no longer manages them.
+    const jurisdiction = await getJurisdictionByUserId(userId);
+    await setJurisdictionTalukas(jurisdiction.id, scope_type === 'district' ? (normalizedTalukaIds || []) : []);
+    await setJurisdictionVillages(jurisdiction.id, scope_type === 'taluka' ? (normalizedVillageIds || []) : []);
+
     res.status(200).json({ success: true, message: 'Representative role assigned successfully' });
   } catch (error) {
     console.error('assignJurisdiction error', error.message || error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Admin-only helper for the "Assign Representative" picker: lists every taluka in a
+// district with who (if anyone) already manages it, so talukas claimed by a different
+// District Representative can be excluded/disabled in the UI. `excludeUserId` is the
+// representative currently being edited — their own existing picks stay selectable.
+export const getDistrictTalukaAssignments = async (req, res) => {
+  try {
+    const { district_id, exclude_user_id } = req.query;
+    if (!district_id) {
+      return res.status(400).json({ message: 'district_id is required' });
+    }
+
+    const talukas = await getTalukasWithAssignmentStatus(district_id, exclude_user_id || null);
+    res.status(200).json(talukas);
+  } catch (error) {
+    console.error('getDistrictTalukaAssignments error', error.message || error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Same idea, one level down: lists every village in a taluka with who (if anyone) already
+// manages it, so villages claimed by a different Taluka Representative can be
+// excluded/disabled in the admin picker.
+export const getTalukaVillageAssignments = async (req, res) => {
+  try {
+    const { taluka_id, exclude_user_id } = req.query;
+    if (!taluka_id) {
+      return res.status(400).json({ message: 'taluka_id is required' });
+    }
+
+    const villages = await getVillagesWithAssignmentStatus(taluka_id, exclude_user_id || null);
+    res.status(200).json(villages);
+  } catch (error) {
+    console.error('getTalukaVillageAssignments error', error.message || error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -108,34 +194,53 @@ export const getMyTeam = async (req, res) => {
 
     const scopeNames = await resolveScopeNames(jurisdiction);
     const scopeLabel = scopeNames.village_name || scopeNames.taluka_name || scopeNames.district_name;
-    const [canViewVillageReps, canViewUsers] = await Promise.all([
+    const [canViewVillageReps, canViewUsers, canCreateUsers, canEditUsers, canDeleteUsers] = await Promise.all([
       jurisdiction.scope_type === 'district'
         ? checkPermission(req.user, 'village.view').then(({ allowed }) => allowed)
         : Promise.resolve(jurisdiction.scope_type === 'taluka'),
       jurisdiction.scope_type !== 'village'
         ? checkPermission(req.user, 'user.view').then(({ allowed }) => allowed)
         : Promise.resolve(true),
+      checkPermission(req.user, 'user.create').then(({ allowed }) => allowed),
+      checkPermission(req.user, 'user.edit').then(({ allowed }) => allowed),
+      checkPermission(req.user, 'user.delete').then(({ allowed }) => allowed),
     ]);
 
     if (jurisdiction.scope_type === 'district') {
-      const talukaReps = await getTalukaRepsInDistrict(jurisdiction.scope_id);
+      // If an admin has narrowed this rep down to a specific taluka subset, only show
+      // those; otherwise (no subset configured yet) fall back to the whole district.
+      const assignedTalukaIds = await getAssignedTalukaIdsForJurisdiction(jurisdiction.id);
+      const talukaReps = assignedTalukaIds.length > 0
+        ? await getTalukaRepsForTalukaIds(assignedTalukaIds)
+        : await getTalukaRepsInDistrict(jurisdiction.scope_id);
       return res.status(200).json({
         scope_type: 'district',
         scope_label: scopeLabel,
         talukaReps,
         canViewVillageReps,
         canViewUsers,
+        canCreateUsers,
+        canEditUsers,
+        canDeleteUsers,
       });
     }
 
     if (jurisdiction.scope_type === 'taluka') {
-      const villageReps = await getVillageRepsInTaluka(jurisdiction.scope_id);
+      // If an admin has narrowed this rep down to a specific village subset, only show
+      // those; otherwise (no subset configured yet) fall back to the whole taluka.
+      const assignedVillageIds = await getAssignedVillageIdsForJurisdiction(jurisdiction.id);
+      const villageReps = assignedVillageIds.length > 0
+        ? await getVillageRepsForVillageIds(assignedVillageIds)
+        : await getVillageRepsInTaluka(jurisdiction.scope_id);
       return res.status(200).json({
         scope_type: 'taluka',
         scope_label: scopeLabel,
         villageReps,
         canViewVillageReps,
         canViewUsers,
+        canCreateUsers,
+        canEditUsers,
+        canDeleteUsers,
       });
     }
 
@@ -146,6 +251,9 @@ export const getMyTeam = async (req, res) => {
       users,
       canViewVillageReps,
       canViewUsers,
+      canCreateUsers,
+      canEditUsers,
+      canDeleteUsers,
     });
   } catch (error) {
     console.error('getMyTeam error', error.message || error);
@@ -171,6 +279,11 @@ export const getTalukaTeam = async (req, res) => {
     }
     if (Number(taluka.district_id) !== Number(jurisdiction.scope_id)) {
       return res.status(403).json({ message: 'You can only view talukas in your assigned district.' });
+    }
+
+    const assignedTalukaIds = await getAssignedTalukaIdsForJurisdiction(jurisdiction.id);
+    if (assignedTalukaIds.length > 0 && !assignedTalukaIds.includes(Number(taluka.id))) {
+      return res.status(403).json({ message: 'This taluka is not assigned to you.' });
     }
 
     const villageReps = await getVillageRepsInTaluka(taluka.id);
@@ -209,6 +322,20 @@ export const getVillageTeam = async (req, res) => {
     );
     if (!isWithinScope) {
       return res.status(403).json({ message: 'You can only view users within your assigned area.' });
+    }
+
+    if (jurisdiction.scope_type === 'district') {
+      const assignedTalukaIds = await getAssignedTalukaIdsForJurisdiction(jurisdiction.id);
+      if (assignedTalukaIds.length > 0 && !assignedTalukaIds.includes(Number(village.taluka_id))) {
+        return res.status(403).json({ message: 'This village is not within your assigned talukas.' });
+      }
+    }
+
+    if (jurisdiction.scope_type === 'taluka') {
+      const assignedVillageIds = await getAssignedVillageIdsForJurisdiction(jurisdiction.id);
+      if (assignedVillageIds.length > 0 && !assignedVillageIds.includes(Number(village.id))) {
+        return res.status(403).json({ message: 'This village is not assigned to you.' });
+      }
     }
 
     const users = await getUsersInVillage(village);

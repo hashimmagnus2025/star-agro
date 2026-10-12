@@ -309,6 +309,34 @@ export const getProductsByUserId = async (userId) => {
   return rows;
 };
 
+// For a District Representative's "My Team Products" approval list — every product
+// whose owner's `users.district` matches the rep's assigned district name.
+export const getProductsByOwnerDistrict = async (districtName) => {
+  const [rows] = await pool.query(`${PRODUCT_WITH_USER_LOCATION_SELECT} WHERE u.district = ? ORDER BY p.created_at DESC`, [districtName]);
+  return rows;
+};
+
+// Same idea, one level down — for a Taluka Representative's "My Team Products" list.
+export const getProductsByOwnerTaluka = async (talukaName) => {
+  const [rows] = await pool.query(`${PRODUCT_WITH_USER_LOCATION_SELECT} WHERE u.taluka = ? ORDER BY p.created_at DESC`, [talukaName]);
+  return rows;
+};
+
+// When a District Representative has been narrowed to a specific taluka subset (rather
+// than their whole district), their "My Team Products" list must match too.
+export const getProductsByOwnerTalukaNames = async (talukaNames) => {
+  if (!talukaNames.length) return [];
+  const [rows] = await pool.query(`${PRODUCT_WITH_USER_LOCATION_SELECT} WHERE u.taluka IN (?) ORDER BY p.created_at DESC`, [talukaNames]);
+  return rows;
+};
+
+// Same idea for a Taluka Representative narrowed to a specific village subset.
+export const getProductsByOwnerVillageNames = async (villageNames) => {
+  if (!villageNames.length) return [];
+  const [rows] = await pool.query(`${PRODUCT_WITH_USER_LOCATION_SELECT} WHERE u.village IN (?) ORDER BY p.created_at DESC`, [villageNames]);
+  return rows;
+};
+
 export const getProductById = async (id) => {
   const [rows] = await pool.query(`${PRODUCT_WITH_USER_LOCATION_SELECT} WHERE p.id = ?`, [id]);
   return rows[0] || null;

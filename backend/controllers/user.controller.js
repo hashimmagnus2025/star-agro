@@ -11,6 +11,7 @@ import { createNotification } from '../models/notification.model.js';
 import { sendWhatsAppMessage } from '../utils/whatsapp.js';
 import { resolveNotificationLang, documentVerifiedMessage, documentRejectedMessage } from '../utils/notificationMessages.js';
 import { resolveUploadedFileUrl } from '../utils/bunny.js';
+import { normalizeVillageManagedUserRole } from '../utils/villageManagedRoles.js';
 
 export const getUserByIdController = async (req, res) => {
     try {
@@ -610,18 +611,21 @@ export const createUserByAdmin = async (req, res) => {
             latitude, longitude, has_solar_dryer, interested_in_solar_dryer, how_know_about_us,
         } = req.body;
 
-        // A Village Representative reaches this route via hasPermission('user.create'), not
-        // the admin/super_admin bypass. They may only create plain users inside their own
-        // village - location fields and role are forced from their jurisdiction, ignoring
-        // whatever the client sent.
+        // A Village Representative may create only the supported account types in their village.
         const isRepresentativeCreator = req.user.role !== 'admin' && req.user.role !== 'super_admin';
         if (isRepresentativeCreator) {
             const jurisdiction = req.userJurisdiction;
             if (!jurisdiction || jurisdiction.scope_type !== 'village') {
                 return res.status(403).json({ message: 'You do not have a village assigned to add users.' });
             }
+            role = normalizeVillageManagedUserRole(role || 'user');
+            if (!role) {
+                return res.status(400).json({ message: 'Select a valid user, farmer, or trader role.' });
+            }
+            if (role !== 'user' && !(await getRoleByName(role))) {
+                return res.status(400).json({ message: 'The selected account role is not configured.' });
+            }
             const scopeNames = await resolveScopeNames(jurisdiction);
-            role = 'user';
             village = scopeNames.village_name;
             taluka = scopeNames.taluka_name;
             district = scopeNames.district_name;
@@ -805,6 +809,18 @@ export const updateUserById = async (req, res) => {
             points,
         } = req.body;
 
+        const isAdminEditor = ['admin', 'super_admin'].includes(req.user.role);
+        let updatedRole = role;
+        if (role !== undefined && !isAdminEditor) {
+            updatedRole = normalizeVillageManagedUserRole(role);
+            if (!updatedRole) {
+                return res.status(400).json({ message: 'Select a valid user, farmer, or trader role.' });
+            }
+            if (updatedRole !== 'user' && !(await getRoleByName(updatedRole))) {
+                return res.status(400).json({ message: 'The selected account role is not configured.' });
+            }
+        }
+
         // Prevent duplicate email conflict
         if (email && email !== existingUser.email) {
             const userWithEmail = await getUserByEmail(email);
@@ -831,11 +847,7 @@ export const updateUserById = async (req, res) => {
             password: existingUser.password,
             referral_code: existingUser.referral_code,
             points: points !== undefined ? Number(points) : existingUser.points,
-            // Only admin/super_admin may change a user's role - a Village Representative
-            // editing a user in their own village (via restrictToOwnVillage) cannot escalate it.
-            role: (role !== undefined && ['admin', 'super_admin'].includes(req.user.role))
-                ? role
-                : existingUser.role,
+            role: role === undefined ? existingUser.role : isAdminEditor ? role : updatedRole,
         };
 
         await updateUser(id, updateData);

@@ -274,6 +274,29 @@ export default function UserLayout({ children }) {
     ...(jurisdiction
       ? [{ href: '/user/my-team', label: currentTranslations.userPanel?.myTeam.myTeam || 'My Team', icon: FaUserFriends }]
       : []),
+    ...(jurisdiction?.scope_type === 'village'
+      ? [{
+        href: '/user/add-user',
+        label: currentTranslations.userPanel?.addUser.addUser || 'Add User',
+        icon: FaUserFriends,
+        permission: 'user.create',
+      },
+      {
+        href: '/user/add-user-products',
+        label: 'Add User Products',
+        icon: FaUserFriends,
+        permission: 'product.create',
+      },
+      ]
+      : []),
+    ...(jurisdiction?.scope_type === 'district' || jurisdiction?.scope_type === 'taluka'
+      ? [{
+        href: '/user/my-team-products',
+        label: 'My Team Products',
+        icon: FaInbox,
+        permission: 'product.approve',
+      }]
+      : []),
     ...(user?.role === PICKUP_ROLE
       ? [{ href: '/user/pickup-crops', label: currentTranslations.pickupCrops?.availableForPickup || 'Available for Pickup', icon: FaTruckLoading }]
       : []),
@@ -292,6 +315,7 @@ export default function UserLayout({ children }) {
       <div className=" min-h-screen">
         {sidebarOpen && isMobile && (
           <div
+
             onClick={() => setSidebarOpen(false)}
             className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm lg:hidden"
           />

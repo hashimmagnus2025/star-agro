@@ -54,6 +54,12 @@ export default function AdminUsersPage() {
   const [talukas, setTalukas] = useState([]);
   const [villages, setVillages] = useState([]);
   const [locationIds, setLocationIds] = useState({ state_id: '', district_id: '', taluka_id: '', village_id: '' });
+  const [districtTalukaOptions, setDistrictTalukaOptions] = useState([]);
+  const [districtTalukaLoading, setDistrictTalukaLoading] = useState(false);
+  const [selectedTalukaIds, setSelectedTalukaIds] = useState([]);
+  const [talukaVillageOptions, setTalukaVillageOptions] = useState([]);
+  const [talukaVillageLoading, setTalukaVillageLoading] = useState(false);
+  const [selectedVillageIds, setSelectedVillageIds] = useState([]);
   const mainRoleOptions = roles.filter((role) => !isRepresentativeRole(role.name));
 
   useEffect(() => {
@@ -105,6 +111,75 @@ export default function AdminUsersPage() {
       .then((res) => setVillages(res.data))
       .catch((error) => { console.error('Failed to load villages', error); setVillages([]); });
   }, [locationIds.taluka_id]);
+
+  // For a District Representative, show every taluka in the chosen district flagged with
+  // who already manages it, so talukas claimed by a different rep can't be double-assigned.
+  // Talukas already assigned to this same rep (from a previous save) come back pre-selected.
+  useEffect(() => {
+    if (jurisdictionForm.scope_type !== 'district' || !locationIds.district_id || !jurisdictionUser) {
+      setDistrictTalukaOptions([]);
+      setSelectedTalukaIds([]);
+      return;
+    }
+    setDistrictTalukaLoading(true);
+    api.get(`/jurisdictions/district-talukas?district_id=${locationIds.district_id}&exclude_user_id=${jurisdictionUser.id}`)
+      .then((res) => {
+        const options = Array.isArray(res.data) ? res.data : [];
+        setDistrictTalukaOptions(options);
+        setSelectedTalukaIds(
+          options
+            .filter((taluka) => Number(taluka.assigned_user_id) === Number(jurisdictionUser.id))
+            .map((taluka) => taluka.id)
+        );
+      })
+      .catch((error) => {
+        console.error('Failed to load district talukas', error);
+        setDistrictTalukaOptions([]);
+        setSelectedTalukaIds([]);
+      })
+      .finally(() => setDistrictTalukaLoading(false));
+  }, [jurisdictionForm.scope_type, locationIds.district_id, jurisdictionUser]);
+
+  const toggleSelectedTaluka = (talukaId) => {
+    setSelectedTalukaIds((prev) =>
+      prev.includes(talukaId) ? prev.filter((id) => id !== talukaId) : [...prev, talukaId]
+    );
+  };
+
+  // Same idea, one level down: for a Taluka Representative, show every village in the
+  // chosen taluka flagged with who already manages it, so villages claimed by a different
+  // rep can't be double-assigned. Villages already assigned to this same rep come back
+  // pre-selected.
+  useEffect(() => {
+    if (jurisdictionForm.scope_type !== 'taluka' || !locationIds.taluka_id || !jurisdictionUser) {
+      setTalukaVillageOptions([]);
+      setSelectedVillageIds([]);
+      return;
+    }
+    setTalukaVillageLoading(true);
+    api.get(`/jurisdictions/taluka-villages?taluka_id=${locationIds.taluka_id}&exclude_user_id=${jurisdictionUser.id}`)
+      .then((res) => {
+        const options = Array.isArray(res.data) ? res.data : [];
+        setTalukaVillageOptions(options);
+        setSelectedVillageIds(
+          options
+            .filter((village) => Number(village.assigned_user_id) === Number(jurisdictionUser.id))
+            .map((village) => village.id)
+        );
+      })
+      .catch((error) => {
+        console.error('Failed to load taluka villages', error);
+        setTalukaVillageOptions([]);
+        setSelectedVillageIds([]);
+      })
+      .finally(() => setTalukaVillageLoading(false));
+  }, [jurisdictionForm.scope_type, locationIds.taluka_id, jurisdictionUser]);
+
+  const toggleSelectedVillage = (villageId) => {
+    setSelectedVillageIds((prev) =>
+      prev.includes(villageId) ? prev.filter((id) => id !== villageId) : [...prev, villageId]
+    );
+  };
 
   const fetchRoles = async () => {
     try {
@@ -301,6 +376,10 @@ export default function AdminUsersPage() {
     setJurisdictionUser(user);
     setJurisdictionForm({ role_name: user.jurisdiction_role_name || '', scope_type: 'district' });
     setLocationIds({ state_id: '', district_id: '', taluka_id: '', village_id: '' });
+    setDistrictTalukaOptions([]);
+    setSelectedTalukaIds([]);
+    setTalukaVillageOptions([]);
+    setSelectedVillageIds([]);
     setShowJurisdictionModal(true);
   };
 
@@ -330,6 +409,8 @@ export default function AdminUsersPage() {
         role_name: jurisdictionForm.role_name,
         scope_type: jurisdictionForm.scope_type,
         scope_id,
+        ...(jurisdictionForm.scope_type === 'district' ? { taluka_ids: selectedTalukaIds } : {}),
+        ...(jurisdictionForm.scope_type === 'taluka' ? { village_ids: selectedVillageIds } : {}),
       });
       handleCloseJurisdiction();
       await fetchUsers();
@@ -777,6 +858,44 @@ export default function AdminUsersPage() {
                 </label>
               </div>
 
+              {jurisdictionForm.scope_type === 'district' && locationIds.district_id && (
+                <div>
+                  <span className="text-sm font-semibold text-slate-700">
+                    Talukas to assign (optional — leave all unchecked to keep this rep on the whole district)
+                  </span>
+                  <div className="mt-2 max-h-56 overflow-y-auto rounded-2xl border border-slate-200 p-3 space-y-1.5">
+                    {districtTalukaLoading && (
+                      <p className="text-sm text-slate-500">Loading talukas...</p>
+                    )}
+                    {!districtTalukaLoading && districtTalukaOptions.length === 0 && (
+                      <p className="text-sm text-slate-500">No talukas found for this district.</p>
+                    )}
+                    {!districtTalukaLoading && districtTalukaOptions.map((taluka) => (
+                      <label
+                        key={taluka.id}
+                        className={`flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm ${
+                          taluka.taken_by ? 'cursor-not-allowed bg-slate-50 text-slate-400' : 'cursor-pointer hover:bg-emerald-50 text-slate-800'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedTalukaIds.includes(taluka.id)}
+                            disabled={Boolean(taluka.taken_by)}
+                            onChange={() => toggleSelectedTaluka(taluka.id)}
+                            className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:cursor-not-allowed"
+                          />
+                          {taluka.taluka_name}
+                        </span>
+                        {taluka.taken_by && (
+                          <span className="text-xs text-slate-400">Assigned to {taluka.taken_by.name || 'another rep'}</span>
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {jurisdictionForm.scope_type !== 'district' && (
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <label className="block">
@@ -809,6 +928,44 @@ export default function AdminUsersPage() {
                       </select>
                     </label>
                   )}
+                </div>
+              )}
+
+              {jurisdictionForm.scope_type === 'taluka' && locationIds.taluka_id && (
+                <div>
+                  <span className="text-sm font-semibold text-slate-700">
+                    Villages to assign (optional — leave all unchecked to keep this rep on the whole taluka)
+                  </span>
+                  <div className="mt-2 max-h-56 overflow-y-auto rounded-2xl border border-slate-200 p-3 space-y-1.5">
+                    {talukaVillageLoading && (
+                      <p className="text-sm text-slate-500">Loading villages...</p>
+                    )}
+                    {!talukaVillageLoading && talukaVillageOptions.length === 0 && (
+                      <p className="text-sm text-slate-500">No villages found for this taluka.</p>
+                    )}
+                    {!talukaVillageLoading && talukaVillageOptions.map((village) => (
+                      <label
+                        key={village.id}
+                        className={`flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm ${
+                          village.taken_by ? 'cursor-not-allowed bg-slate-50 text-slate-400' : 'cursor-pointer hover:bg-emerald-50 text-slate-800'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedVillageIds.includes(village.id)}
+                            disabled={Boolean(village.taken_by)}
+                            onChange={() => toggleSelectedVillage(village.id)}
+                            className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:cursor-not-allowed"
+                          />
+                          {village.village_name}
+                        </span>
+                        {village.taken_by && (
+                          <span className="text-xs text-slate-400">Assigned to {village.taken_by.name || 'another rep'}</span>
+                        )}
+                      </label>
+                    ))}
+                  </div>
                 </div>
               )}
 
