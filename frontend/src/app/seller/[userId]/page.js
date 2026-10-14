@@ -605,11 +605,22 @@ export default function SellerDetailsPage() {
                         >
                             {advertisements.map((ad) => (
                                 <SwiperSlide key={ad.id}>
-                                    <img
-                                        src={getMediaUrl(ad.image)}
-                                        alt={ad.title}
-                                        className="h-full w-full object-cover"
-                                    />
+                                    {ad.type === 'video' ? (
+                                        <video
+                                            src={getMediaUrl(ad.image)}
+                                            className="h-full w-full object-cover"
+                                            autoPlay
+                                            loop
+                                            muted
+                                            playsInline
+                                        />
+                                    ) : (
+                                        <img
+                                            src={getMediaUrl(ad.image)}
+                                            alt={ad.title}
+                                            className="h-full w-full object-cover"
+                                        />
+                                    )}
                                 </SwiperSlide>
                             ))}
                         </Swiper>

@@ -6,6 +6,7 @@ import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import api from '../../utils/api.js';
 import Pagination from '../components/Pagination.js';
+import RichTextEditor from '../components/RichTextEditor.js';
 
 const PAGE_OPTIONS = [
   { value: 'Home', label: 'Home' },
@@ -14,7 +15,11 @@ const PAGE_OPTIONS = [
   { value: 'Crops', label: 'Crops' },
   { value: 'Gallery', label: 'Gallery' },
   { value: 'Contact Us', label: 'Contact Us' },
+  { value: 'Terms & Conditions', label: 'Terms & Conditions' },
+  { value: 'Privacy Policy', label: 'Privacy Policy' },
 ];
+
+const LEGAL_PAGES = ['Terms & Conditions', 'Privacy Policy'];
 
 const TYPE_OPTIONS = [
   { value: 'banner', label: 'Banner / Hero' },
@@ -98,8 +103,8 @@ export default function CmsAdminPage() {
     setFormData({
       page: filterPage,
       language: 'en',
-      section: '',
-      type: 'banner',
+      section: LEGAL_PAGES.includes(filterPage) ? 'Body' : '',
+      type: LEGAL_PAGES.includes(filterPage) ? 'content' : 'banner',
       title: '',
       subtitle: '',
       content: '',
@@ -293,7 +298,7 @@ export default function CmsAdminPage() {
           <p className="text-sm uppercase tracking-[0.24em] text-emerald-600">Content Management</p>
           <h1 className="mt-2 text-3xl font-bold text-slate-900">CMS for website pages</h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-600">
-            Manage banners, text, image blocks and page content for Home, About, Services, Crops, Gallery, and Contact Us.
+            Manage banners, text, image blocks and page content for Home, About, Services, Crops, Gallery, Contact Us, Terms & Conditions, and Privacy Policy.
           </p>
         </div>
         <button
@@ -528,14 +533,22 @@ export default function CmsAdminPage() {
 
               <label className="space-y-2 text-sm font-semibold text-slate-700">
                 Content or description
-                <textarea
-                  name="content"
-                  value={formData.content}
-                  onChange={handleInputChange}
-                  rows="5"
-                  placeholder="Text, paragraph, caption or HTML content"
-                  className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 placeholder-slate-400 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 resize-none"
-                />
+                {LEGAL_PAGES.includes(formData.page) ? (
+                  <RichTextEditor
+                    value={formData.content}
+                    onChange={(html) => setFormData((prev) => ({ ...prev, content: html }))}
+                    placeholder="Write the full Terms & Conditions / Privacy Policy content here"
+                  />
+                ) : (
+                  <textarea
+                    name="content"
+                    value={formData.content}
+                    onChange={handleInputChange}
+                    rows="5"
+                    placeholder="Text, paragraph, caption or HTML content"
+                    className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 placeholder-slate-400 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 resize-none"
+                  />
+                )}
               </label>
 
               <div className="grid gap-4 md:grid-cols-3">
