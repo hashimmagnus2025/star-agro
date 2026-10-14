@@ -10,7 +10,7 @@ import {
 } from '../controllers/advertisement.controller.js';
 import { protect, authorize } from '../middleware/auth.middleware.js';
 
-const upload = createUploader('advertisements');
+const upload = createUploader('advertisements', 100 * 1024 * 1024);
 const AdvertisementRoutes = express.Router();
 
 AdvertisementRoutes.get('/', getAdvertisements);

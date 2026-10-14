@@ -76,7 +76,8 @@ const resolveSizeDurationPrice = async (adSizeId, adDurationId) => {
 
 export const createAdvertisement = async (req, res) => {
     try {
-        const { title, description, keywords, status, startdate, enddate, tags, ad_size_id, ad_duration_id } = req.body;
+        const { title, description, keywords, status, startdate, enddate, tags, ad_size_id, ad_duration_id, type } = req.body;
+        const mediaType = type === 'video' ? 'video' : 'image';
         const uploadedFile = req.file;
         const localImage = uploadedFile ? `/uploads/advertisements/${uploadedFile.filename}` : null;
 
@@ -86,7 +87,7 @@ export const createAdvertisement = async (req, res) => {
             return res.status(400).json({ message: resolved.error });
         }
 
-        if (localImage) {
+        if (localImage && mediaType === 'image') {
             const validationError = validateImageMatchesSize(localImage, resolved.image_size);
             if (validationError) {
                 fs.unlinkSync(uploadedFile.path);
@@ -99,7 +100,7 @@ export const createAdvertisement = async (req, res) => {
         const image = uploadedFile ? await resolveUploadedFileUrl(uploadedFile, 'advertisements') : null;
 
         const advertisementId = await insertAdvertisement({
-            title, description, image, image_size: resolved.image_size, keywords,
+            title, description, image, type: mediaType, image_size: resolved.image_size, keywords,
             duration: resolved.duration, price: resolved.price, status, startdate, enddate, tags,
             adSizeId: ad_size_id, adDurationId: ad_duration_id,
         });
@@ -147,7 +148,7 @@ export const getAdvertisementByIds = async (req, res) => {
 export const updateAdvertisementController = async (req, res) => {
     try {
         const { id } = req.params;
-        const { title, description, keywords, status, startdate, enddate, tags, ad_size_id, ad_duration_id } = req.body;
+        const { title, description, keywords, status, startdate, enddate, tags, ad_size_id, ad_duration_id, type } = req.body;
         const uploadedFile = req.file;
 
         const existingAdvertisement = await getAdvertisementById(id);
@@ -155,6 +156,8 @@ export const updateAdvertisementController = async (req, res) => {
             if (uploadedFile) fs.unlinkSync(uploadedFile.path);
             return res.status(404).json({ message: 'Advertisement not found' });
         }
+
+        const mediaType = type === 'video' ? 'video' : (type === 'image' ? 'image' : (existingAdvertisement.type || 'image'));
 
         const finalSizeId = ad_size_id || existingAdvertisement.ad_size_id;
         const finalDurationId = ad_duration_id || existingAdvertisement.ad_duration_id;
@@ -167,7 +170,7 @@ export const updateAdvertisementController = async (req, res) => {
 
         const localImage = uploadedFile ? `/uploads/advertisements/${uploadedFile.filename}` : existingAdvertisement.image;
 
-        if (localImage) {
+        if (localImage && mediaType === 'image') {
             const validationError = validateImageMatchesSize(localImage, resolved.image_size);
             if (validationError) {
                 if (uploadedFile) fs.unlinkSync(uploadedFile.path);
@@ -178,7 +181,7 @@ export const updateAdvertisementController = async (req, res) => {
         const image = uploadedFile ? await resolveUploadedFileUrl(uploadedFile, 'advertisements') : existingAdvertisement.image;
 
         await updateAdvertisement(id, {
-            title, description, image, image_size: resolved.image_size, keywords,
+            title, description, image, type: mediaType, image_size: resolved.image_size, keywords,
             duration: resolved.duration, price: resolved.price, status: status || existingAdvertisement.status,
             startdate, enddate, tags, adSizeId: finalSizeId, adDurationId: finalDurationId,
         });

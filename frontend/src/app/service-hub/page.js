@@ -164,7 +164,18 @@ export default function ServiceHubPage() {
                             <h3 className="absolute top-2 left-2 z-10 rounded-full bg-gray-700 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">
                                 {t?.advertisement || 'Advertisement'}
                             </h3>
-                            <img src={getMediaUrl(ad.image)} alt={ad.title} className="h-full w-full object-cover" />
+                            {ad.type === 'video' ? (
+                                <video
+                                    src={getMediaUrl(ad.image)}
+                                    className="h-full w-full object-cover"
+                                    autoPlay
+                                    loop
+                                    muted
+                                    playsInline
+                                />
+                            ) : (
+                                <img src={getMediaUrl(ad.image)} alt={ad.title} className="h-full w-full object-cover" />
+                            )}
                         </SwiperSlide>
                     ))}
                 </Swiper>
@@ -215,11 +226,22 @@ export default function ServiceHubPage() {
                 className="group flex flex-col overflow-hidden rounded-[24px] border border-gray-100/50 bg-white p-3 shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_20px_50px_rgba(10,26,18,0.12)] cursor-pointer"
             >
                 <div className="relative mb-3 h-[150px] w-full overflow-hidden rounded-[18px] bg-gray-50">
-                    <img
-                        src={getMediaUrl(slot.ad.image)}
-                        alt={slot.ad.title}
-                        className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
-                    />
+                    {slot.ad.type === 'video' ? (
+                        <video
+                            src={getMediaUrl(slot.ad.image)}
+                            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                        />
+                    ) : (
+                        <img
+                            src={getMediaUrl(slot.ad.image)}
+                            alt={slot.ad.title}
+                            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        />
+                    )}
                 </div>
                 <div className="flex flex-1 flex-col px-3 pb-2">
                     <h2 className="line-clamp-1 text-md font-bold text-[#0A1A12]">{t?.advertisement || 'Advertisement'}</h2>
@@ -356,11 +378,22 @@ export default function ServiceHubPage() {
                                 <SwiperSlide key={ad.id}>
                                     <div className="group flex flex-col overflow-hidden rounded-[24px] border border-gray-100/50 bg-white p-3 shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
                                         <div className="relative mb-3 h-[235px] w-full overflow-hidden rounded-[18px] bg-gray-50">
-                                            <img
-                                                src={getMediaUrl(ad.image)}
-                                                alt={ad.title}
-                                                className="h-full w-full object-cover"
-                                            />
+                                            {ad.type === 'video' ? (
+                                                <video
+                                                    src={getMediaUrl(ad.image)}
+                                                    className="h-full w-full object-cover"
+                                                    autoPlay
+                                                    loop
+                                                    muted
+                                                    playsInline
+                                                />
+                                            ) : (
+                                                <img
+                                                    src={getMediaUrl(ad.image)}
+                                                    alt={ad.title}
+                                                    className="h-full w-full object-cover"
+                                                />
+                                            )}
                                         </div>
                                         <div className="flex flex-1 flex-col px-3 pb-2">
                                             <h2 className="line-clamp-1 text-md font-bold text-[#0A1A12]">{t?.advertisement || 'Advertisement'}</h2>

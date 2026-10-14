@@ -650,7 +650,7 @@ export const updateProductStatusController = async (req, res) => {
       }
     }
 
-    await updateProductStatus(id, status);
+    await updateProductStatus(id, status, req.user.id);
 
     if (status === 'Approved' || status === 'Rejected') {
       const isCrop = String(existingProduct.type || '').toLowerCase() === 'crop';

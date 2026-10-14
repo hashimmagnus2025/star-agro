@@ -232,6 +232,24 @@ export const createProductsTable = async () => {
       // ignore
     }
   }
+
+  // Whoever last set the product's status via updateProductStatus — admin/super_admin, or a
+  // District/Taluka Representative with the product.approve permission. Shown as "Approved By"
+  // in the admin Products list.
+  try {
+    await pool.query('ALTER TABLE products ADD COLUMN approved_by BIGINT UNSIGNED DEFAULT NULL');
+  } catch (alterError) {
+    if (!/Duplicate column name|Column 'approved_by' already exists/i.test(alterError.message)) {
+      // ignore
+    }
+  }
+  try {
+    await pool.query('ALTER TABLE products ADD CONSTRAINT fk_product_approved_by FOREIGN KEY (approved_by) REFERENCES users(id) ON DELETE SET NULL');
+  } catch (alterError) {
+    if (!/Duplicate key|already exists|Duplicate foreign key/i.test(alterError.message)) {
+      // ignore
+    }
+  }
 };
 
 export const insertProduct = async (product) => {
@@ -278,10 +296,15 @@ const PRODUCT_WITH_USER_LOCATION_SELECT = `
     u.role AS owner_role, u.first_name AS owner_first_name, u.last_name AS owner_last_name,
     u.email AS owner_email, u.gender AS owner_gender, u.address AS owner_address,
     u.has_solar_dryer AS owner_has_solar_dryer, u.how_know_about_us AS owner_how_know_about_us,
-    c.name AS destroy_claimed_by_name, c.phone AS destroy_claimed_by_phone
+    c.name AS destroy_claimed_by_name, c.phone AS destroy_claimed_by_phone,
+    COALESCE(NULLIF(TRIM(a.name), ''), NULLIF(TRIM(CONCAT_WS(' ', a.first_name, a.last_name)), '')) AS approved_by_name,
+    a.role AS approved_by_role,
+    aj.role_name AS approved_by_jurisdiction_role
   FROM products p
   LEFT JOIN users u ON p.user_id = u.id
   LEFT JOIN users c ON p.destroy_claimed_by = c.id
+  LEFT JOIN users a ON p.approved_by = a.id
+  LEFT JOIN user_jurisdictions aj ON aj.user_id = a.id
 `;
 
 export const getAllProducts = async () => {
@@ -384,9 +407,9 @@ export const deleteProduct = async (id) => {
   return pool.query(sql, [id]);
 };
 
-export const updateProductStatus = async (id, status) => {
-  const sql = 'UPDATE products SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?';
-  return pool.query(sql, [status, id]);
+export const updateProductStatus = async (id, status, approvedBy = null) => {
+  const sql = 'UPDATE products SET status = ?, approved_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?';
+  return pool.query(sql, [status, approvedBy, id]);
 };
 
 export const updateProductActive = async (id, isActive) => {
