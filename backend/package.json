@@ -4,9 +4,9 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js",
-    "build:frontend": "next build ../frontend",
+    "start": "node init && node server.js",
+    "dev": "node init && nodemon server.js",
+    "build:frontend": "node init && next build ../frontend",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

@@ -71,7 +71,7 @@ export default function Footer() {
                 <li><a href="/contact" className="hover:text-white">{t.contact}</a></li>
                 <li><a href="/terms-and-conditions" className="hover:text-white">{t.TermsConditions}</a></li>
                 <li><a href="/privacy-policy" className="hover:text-white">{t.PrivacyPolicy}</a></li>
-                <li><a href="/how-to-use" className="hover:text-white">{t.howtouse}</a></li>
+                <li><a href="/how-to-use" className="font-semibold text-green-400 animate-pulse [animation-duration:1.5s] hover:text-white">{t.howtouse}</a></li>
                 <li><a href="/advertisements" className="hover:text-white">{t.AllAdvertisements}</a></li>
 
               </ul>

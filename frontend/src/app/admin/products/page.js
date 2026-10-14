@@ -898,10 +898,11 @@ export default function ProductsPage() {
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">Farmer</th>
 
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">Category</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">Sub-Category</th>
+                
 
 
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">Status</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">Approved By</th>
                 <th className="px-6 py-4 text-center text-sm font-semibold text-slate-900">Active</th>
                 <th className="px-6 py-4 text-center text-sm font-semibold text-slate-900">Actions</th>
               </tr>
@@ -931,10 +932,7 @@ export default function ProductsPage() {
                     <span className="block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 sm:hidden">Category</span>
                     {getCategoryName(product.category_id)}
                   </td>
-                  <td className="block sm:table-cell px-6 py-4 align-top text-slate-600">
-                    <span className="block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 sm:hidden">Sub-Category</span>
-                    {getSubCategoryName(product.sub_category_id)}
-                  </td>
+                  
 
 
                   <td className="block sm:table-cell px-6 py-4 align-top text-slate-600">
@@ -947,6 +945,21 @@ export default function ProductsPage() {
                       }`}>
                       {product.status || 'Pending'}
                     </span>
+                  </td>
+                  <td className="block sm:table-cell px-6 py-4 align-top text-slate-600">
+                    <span className="block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 sm:hidden">Approved By</span>
+                    {product.approved_by_name ? (
+                      <>
+                        <span className="block font-medium text-slate-900">{product.approved_by_name}</span>
+                        <span className="block text-xs text-slate-500">
+                          {product.approved_by_role === 'admin' || product.approved_by_role === 'super_admin'
+                            ? 'Admin'
+                            : product.approved_by_jurisdiction_role || ''}
+                        </span>
+                      </>
+                    ) : (
+                      '-'
+                    )}
                   </td>
                   <td className="block sm:table-cell px-6 py-4 align-top text-center">
                     <span className="block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 sm:hidden">Active</span>

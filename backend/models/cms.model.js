@@ -9,7 +9,7 @@ export const createCmsTable = async () => {
       type VARCHAR(50) NOT NULL,
       title VARCHAR(255) DEFAULT NULL,
       subtitle VARCHAR(255) DEFAULT NULL,
-      content TEXT,
+      content MEDIUMTEXT,
       image_url TEXT,
       button_text VARCHAR(100) DEFAULT NULL,  
       button_link VARCHAR(255) DEFAULT NULL,
@@ -54,6 +54,12 @@ export const createCmsTable = async () => {
     if (!columnNames.includes('text_6')) {
       await pool.query('ALTER TABLE cms_content ADD COLUMN text_6 TEXT DEFAULT NULL AFTER text_5');
       console.log('Added text_6 column to cms_content table');
+    }
+
+    const contentColumn = columns.find((c) => c.Field === 'content');
+    if (contentColumn && contentColumn.Type !== 'mediumtext') {
+      await pool.query('ALTER TABLE cms_content MODIFY COLUMN content MEDIUMTEXT');
+      console.log('Widened cms_content.content column to MEDIUMTEXT');
     }
   } catch (err) {
     console.error('Error altering cms_content table:', err);
