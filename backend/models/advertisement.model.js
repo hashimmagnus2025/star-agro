@@ -9,6 +9,7 @@ export const createAdvertisementTable = async () => {
       enddate DATE DEFAULT NULL,
       description TEXT DEFAULT NULL,
       image VARCHAR(255) DEFAULT NULL,
+      type VARCHAR(20) DEFAULT 'image',
       image_size VARCHAR(50) DEFAULT NULL,
       keywords TEXT DEFAULT NULL,
       duration VARCHAR(50) DEFAULT NULL,
@@ -66,6 +67,11 @@ export const createAdvertisementTable = async () => {
   if (adDurationIdColumns.length === 0) {
     await pool.query(`ALTER TABLE advertisements ADD COLUMN ad_duration_id BIGINT UNSIGNED DEFAULT NULL`);
   }
+
+  const [typeColumns] = await pool.query(`SHOW COLUMNS FROM advertisements LIKE 'type'`);
+  if (typeColumns.length === 0) {
+    await pool.query(`ALTER TABLE advertisements ADD COLUMN type VARCHAR(20) DEFAULT 'image'`);
+  }
 };
 
 const SELECT_WITH_JOINS = `
@@ -77,12 +83,12 @@ const SELECT_WITH_JOINS = `
   LEFT JOIN advertisement_durations durations ON durations.id = advertisements.ad_duration_id
 `;
 
-export const insertAdvertisement = async ({ title, description, image, image_size, keywords, duration, price, status, startdate, enddate, tags, adSizeId, adDurationId }) => {
+export const insertAdvertisement = async ({ title, description, image, type, image_size, keywords, duration, price, status, startdate, enddate, tags, adSizeId, adDurationId }) => {
     const sql = `
-      INSERT INTO advertisements (title, description, image, image_size, keywords, duration, price, status, startdate, enddate, tags, ad_size_id, ad_duration_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO advertisements (title, description, image, type, image_size, keywords, duration, price, status, startdate, enddate, tags, ad_size_id, ad_duration_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    const [result] = await pool.query(sql, [title, description, image, image_size, keywords, duration, price, status || 'Active', startdate, enddate, tags, adSizeId || null, adDurationId || null]);
+    const [result] = await pool.query(sql, [title, description, image, type || 'image', image_size, keywords, duration, price, status || 'Active', startdate, enddate, tags, adSizeId || null, adDurationId || null]);
     return result.insertId;
 }
 
@@ -107,13 +113,13 @@ export const getAdvertisementById = async (id) => {
     const [rows] = await pool.query(sql, [id]);
     return rows[0];
 }
-export const updateAdvertisement = async (id, { title, description, image, image_size, keywords, duration, price, status, startdate, enddate, tags, adSizeId, adDurationId }) => {
+export const updateAdvertisement = async (id, { title, description, image, type, image_size, keywords, duration, price, status, startdate, enddate, tags, adSizeId, adDurationId }) => {
     const sql = `
       UPDATE advertisements
-        SET title = ?, description = ?, image = ?, image_size = ?, keywords = ?, duration = ?, price = ?, status = ?, startdate = ?, enddate = ?, tags = ?, ad_size_id = ?, ad_duration_id = ?
+        SET title = ?, description = ?, image = ?, type = ?, image_size = ?, keywords = ?, duration = ?, price = ?, status = ?, startdate = ?, enddate = ?, tags = ?, ad_size_id = ?, ad_duration_id = ?
     WHERE id = ?
     `;
-    await pool.query(sql, [title, description, image, image_size, keywords, duration, price, status || 'Active', startdate, enddate, tags, adSizeId || null, adDurationId || null, id]);
+    await pool.query(sql, [title, description, image, type || 'image', image_size, keywords, duration, price, status || 'Active', startdate, enddate, tags, adSizeId || null, adDurationId || null, id]);
 }
 
 export const deleteAdvertisement = async (id) => {

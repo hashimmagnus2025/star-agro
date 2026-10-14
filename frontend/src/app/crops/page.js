@@ -699,11 +699,22 @@ export default function Crops() {
                             <h3 className="absolute top-2 left-2 bg-gray-700 backdrop-blur-sm text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1">
                                 {t?.advertisement || 'Advertisement'}
                             </h3>
-                            <img
-                                src={getImageUrl(ad.image)}
-                                alt={ad.title}
-                                className="h-full w-full object-cover"
-                            />
+                            {ad.type === 'video' ? (
+                                <video
+                                    src={getImageUrl(ad.image)}
+                                    className="h-full w-full object-cover"
+                                    autoPlay
+                                    loop
+                                    muted
+                                    playsInline
+                                />
+                            ) : (
+                                <img
+                                    src={getImageUrl(ad.image)}
+                                    alt={ad.title}
+                                    className="h-full w-full object-cover"
+                                />
+                            )}
                         </SwiperSlide>
                     ))}
                 </Swiper>
@@ -724,11 +735,22 @@ export default function Crops() {
                 className="group bg-white rounded-[24px] p-3 shadow-[0_8px_30px_rgba(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgba(10,26,18,0.12)] border border-gray-100/50 transition-all duration-500 hover:-translate-y-2 flex flex-col cursor-pointer"
             >
                 <div className="relative w-full h-[150px] rounded-[18px] bg-gray-50 overflow-hidden mb-3">
-                    <img
-                        src={getImageUrl(slot.ad.image)}
-                        alt={slot.ad.title}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
-                    />
+                    {slot.ad.type === 'video' ? (
+                        <video
+                            src={getImageUrl(slot.ad.image)}
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                        />
+                    ) : (
+                        <img
+                            src={getImageUrl(slot.ad.image)}
+                            alt={slot.ad.title}
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
+                        />
+                    )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
 
                 </div>
@@ -1446,11 +1468,22 @@ export default function Crops() {
                             {squareAdvertisements.filter((ad) => ad && ad.id).map((ad) => (
                                 <SwiperSlide key={ad.id}>
                                     <div className="relative w-full aspect-square rounded-[18px] overflow-hidden bg-white">
-                                        <img
-                                            src={getImageUrl(ad.image)}
-                                            alt={ad.title}
-                                            className="w-full h-full object-contain"
-                                        />
+                                        {ad.type === 'video' ? (
+                                            <video
+                                                src={getImageUrl(ad.image)}
+                                                className="w-full h-full object-contain"
+                                                autoPlay
+                                                loop
+                                                muted
+                                                playsInline
+                                            />
+                                        ) : (
+                                            <img
+                                                src={getImageUrl(ad.image)}
+                                                alt={ad.title}
+                                                className="w-full h-full object-contain"
+                                            />
+                                        )}
                                     </div>
                                 </SwiperSlide>
                             ))}

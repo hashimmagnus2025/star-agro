@@ -9,6 +9,11 @@ const BUNNY_PULL_ZONE_URL = (process.env.BUNNY_PULL_ZONE_URL || '').replace(/\/$
 export const isBunnyConfigured = () =>
   Boolean(BUNNY_STORAGE_HOST && BUNNY_STORAGE_ZONE && BUNNY_STORAGE_ACCESS_KEY && BUNNY_PULL_ZONE_URL);
 
+// Only these content types go to Bunny CDN; everything else stays on local /uploads disk
+// storage, even when Bunny is configured — keeps CDN storage/bandwidth usage limited to
+// the high-traffic, high-size content (product media, onboarding videos, ad banners).
+const BUNNY_ENABLED_FOLDERS = new Set(['how-to-use', 'products/images', 'products/videos', 'advertisements']);
+
 // Uploads a local file to Bunny Storage and returns its public CDN URL (via the Pull Zone).
 export const uploadFileToBunny = async (localFilePath, remoteFolder, remoteFileName) => {
   const fileBuffer = fs.readFileSync(localFilePath);
@@ -29,12 +34,13 @@ export const uploadFileToBunny = async (localFilePath, remoteFolder, remoteFileN
 
 // Convenience wrapper for the common case: a single multer disk-storage file that
 // should end up under the same-named remote and local folder. Uploads to Bunny when
-// configured (deleting the local temp copy afterwards); otherwise/on failure, falls
-// back to the local /uploads URL so an upload never gets blocked by a CDN outage.
+// configured AND the folder is in BUNNY_ENABLED_FOLDERS (deleting the local temp copy
+// afterwards); otherwise (folder not CDN-eligible, Bunny not configured, or upload
+// fails) falls back to the local /uploads URL so an upload never gets blocked.
 export const resolveUploadedFileUrl = async (file, folder) => {
   if (!file) return null;
 
-  if (isBunnyConfigured()) {
+  if (isBunnyConfigured() && BUNNY_ENABLED_FOLDERS.has(folder)) {
     try {
       const cdnUrl = await uploadFileToBunny(file.path, folder, file.filename);
       fs.unlink(file.path, () => {});

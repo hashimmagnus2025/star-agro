@@ -916,11 +916,22 @@ export default function ProductDetailsPage({ params }) {
                                     >
                                         {verticalAdvertisements.map((ad) => (
                                             <SwiperSlide key={ad.id} className="overflow-hidden rounded-[26px]">
-                                                <img
-                                                    src={resolveMediaUrl(ad.image)}
-                                                    alt={ad.title}
-                                                    className="h-full w-full object-cover"
-                                                />
+                                                {ad.type === 'video' ? (
+                                                    <video
+                                                        src={resolveMediaUrl(ad.image)}
+                                                        className="h-full w-full object-cover"
+                                                        autoPlay
+                                                        loop
+                                                        muted
+                                                        playsInline
+                                                    />
+                                                ) : (
+                                                    <img
+                                                        src={resolveMediaUrl(ad.image)}
+                                                        alt={ad.title}
+                                                        className="h-full w-full object-cover"
+                                                    />
+                                                )}
                                             </SwiperSlide>
                                         ))}
                                     </Swiper>
@@ -1090,11 +1101,22 @@ export default function ProductDetailsPage({ params }) {
                     >
                         {advertisements.map((ad) => (
                             <SwiperSlide key={ad.id}>
-                                <img
-                                    src={resolveMediaUrl(ad.image)}
-                                    alt={ad.title}
-                                    className="h-full w-full object-cover"
-                                />
+                                {ad.type === 'video' ? (
+                                    <video
+                                        src={resolveMediaUrl(ad.image)}
+                                        className="h-full w-full object-cover"
+                                        autoPlay
+                                        loop
+                                        muted
+                                        playsInline
+                                    />
+                                ) : (
+                                    <img
+                                        src={resolveMediaUrl(ad.image)}
+                                        alt={ad.title}
+                                        className="h-full w-full object-cover"
+                                    />
+                                )}
                             </SwiperSlide>
                         ))}
                     </Swiper>

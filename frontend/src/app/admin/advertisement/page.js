@@ -21,8 +21,9 @@ const toDateInputValue = (date) => {
     return `${year}-${month}-${day}`;
 };
 
-// Computes Start Date + duration (interpreted per unit label). Returns '' when the
-// duration is 'Lifetime' (no fixed end) or the inputs aren't ready yet.
+// Computes Start Date + duration (interpreted per unit label), with the start day itself
+// counted as day 1 — e.g. a 1-month ad starting 13-Oct runs through 12-Nov, not 13-Nov.
+// Returns '' when the duration is 'Lifetime' (no fixed end) or the inputs aren't ready yet.
 const calculateEndDate = (startDate, duration, label) => {
     if (!startDate || !duration || !label || label === 'Lifetime') return '';
 
@@ -37,6 +38,8 @@ const calculateEndDate = (startDate, duration, label) => {
     else if (label === 'Months') end.setMonth(end.getMonth() + amount);
     else if (label === 'Years') end.setFullYear(end.getFullYear() + amount);
     else return '';
+
+    end.setDate(end.getDate() - 1);
 
     return toDateInputValue(end);
 };
@@ -63,6 +66,7 @@ export default function Advertisement() {
         enddate: '',
         keywords: '',
         image: null,
+        type: 'image',
         tags: ''
     });
 
@@ -77,6 +81,7 @@ export default function Advertisement() {
             enddate: '',
             keywords: '',
             image: null,
+            type: 'image',
             tags: ''
         });
     };
@@ -133,6 +138,7 @@ export default function Advertisement() {
             enddate: advertisement.enddate || '',
             keywords: advertisement.keywords || '',
             image: null,
+            type: advertisement.type === 'video' ? 'video' : 'image',
             tags: advertisement.tags || ''
         });
         setEditingId(advertisement.id);
@@ -155,6 +161,12 @@ export default function Advertisement() {
         if (name === 'image') {
             setFormData((prev) => ({ ...prev, image: files?.[0] || null }));
             setImageError('');
+            return;
+        }
+
+        if (name === 'type') {
+            setImageError('');
+            setFormData((prev) => ({ ...prev, type: value, image: null }));
             return;
         }
 
@@ -211,7 +223,7 @@ export default function Advertisement() {
         if (!formData.ad_duration_id) requiredErrors.ad_duration_id = 'Duration is required';
         if (!formData.startdate) requiredErrors.startdate = 'Start date is required';
         if (!formData.enddate && selectedPrice?.label !== 'Lifetime') requiredErrors.enddate = 'End date is required';
-        if (!editingId && !(formData.image instanceof File)) requiredErrors.image = 'Image is required';
+        if (!editingId && !(formData.image instanceof File)) requiredErrors.image = formData.type === 'video' ? 'Video is required' : 'Image is required';
 
         if (Object.keys(requiredErrors).length > 0) {
             setFormErrors(requiredErrors);
@@ -219,7 +231,7 @@ export default function Advertisement() {
         }
         setFormErrors({});
 
-        if (formData.image instanceof File) {
+        if (formData.image instanceof File && formData.type !== 'video') {
             if (!selectedSize) {
                 setImageError('Please select a size before uploading an image');
                 return;
@@ -258,6 +270,7 @@ export default function Advertisement() {
             form.append('ad_duration_id', formData.ad_duration_id);
             form.append('status', formData.status);
             form.append('tags', formData.tags);
+            form.append('type', formData.type);
             if (formData.image instanceof File) {
                 form.append('image', formData.image);
             }
@@ -360,14 +373,23 @@ export default function Advertisement() {
                                 </div>
 
                                 {ad.image ? (
-                                    <img
-                                        src={resolveMediaUrl(ad.image)}
-                                        alt={ad.title}
-                                        className="mt-4 h-40 w-full rounded-xl object-cover"
-                                    />
+                                    ad.type === 'video' ? (
+                                        <video
+                                            src={resolveMediaUrl(ad.image)}
+                                            className="mt-4 h-40 w-full rounded-xl object-cover"
+                                            controls
+                                            muted
+                                        />
+                                    ) : (
+                                        <img
+                                            src={resolveMediaUrl(ad.image)}
+                                            alt={ad.title}
+                                            className="mt-4 h-40 w-full rounded-xl object-cover"
+                                        />
+                                    )
                                 ) : (
                                     <div className="mt-4 flex h-40 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-500">
-                                        No image
+                                        No media
                                     </div>
                                 )}
 
@@ -570,14 +592,37 @@ export default function Advertisement() {
                             </div>
 
                             <div>
-                                <label className="mb-2 block text-sm font-semibold text-slate-900">Image</label>
+                                <label className="mb-2 block text-sm font-semibold text-slate-900">Type</label>
+                                <select
+                                    name="type"
+                                    value={formData.type}
+                                    onChange={handleInputChange}
+                                    className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 outline-none"
+                                >
+                                    <option value="image">Image</option>
+                                    <option value="video">Video</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="mb-2 block text-sm font-semibold text-slate-900">
+                                    {formData.type === 'video' ? 'Video' : 'Image'}
+                                </label>
                                 <input
                                     type="file"
                                     name="image"
-                                    accept="image/*"
+                                    accept={formData.type === 'video' ? 'video/*' : 'image/*'}
                                     onChange={handleInputChange}
                                     className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 outline-none"
                                 />
+                                {formData.image instanceof File && formData.type === 'video' && (
+                                    <video
+                                        src={URL.createObjectURL(formData.image)}
+                                        className="mt-3 h-40 w-full rounded-xl object-cover"
+                                        controls
+                                        muted
+                                    />
+                                )}
                                 {formErrors.image && (
                                     <p className="mt-2 text-sm text-red-600">{formErrors.image}</p>
                                 )}
